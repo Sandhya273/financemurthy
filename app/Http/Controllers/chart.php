@@ -13,34 +13,33 @@ class chart extends Controller
     public function index()
     {
         
-        $result = DB::select("
-            SELECT
-                c.name AS bank_organization_name,
-                SUM(i.maturityamount) AS total_investment
-            FROM
-                investments i
-            JOIN
-                investmentcompanies c ON i.investmentcompanyid = c.id
-            WHERE
-                i.isdeleted = 0
-            GROUP BY
-                c.name
-            ORDER BY
-                total_investment DESC
-        ");
-
-        $chartData = '';
-
-        
-        foreach ($result as $list) {
+        try {
             
-            $chartData .= "['" . addslashes($list->bank_organization_name) . "', " . $list->total_investment . "],";
+            $result = DB::table('investments as i')
+                ->join('investmentcompanies as c', 'i.investmentcompanyid', '=', 'c.id')
+                ->where('i.isdeleted', 0)
+                ->select(DB::raw('DATE(i.maturitydate) as maturity_date'), DB::raw('SUM(i.maturityamount) as total_investment'))
+                ->groupBy(DB::raw('DATE(i.maturitydate)'))
+                ->orderBy('maturity_date')
+                ->get();
+
+            if ($result->isEmpty()) {
+                return view('chart')->with('chartData', '');
+            }
+
+            
+            $chartData = '';
+            foreach ($result as $list) {
+                $chartData .= "['" . $list->maturity_date . "', " . $list->total_investment . "],";
+            }
+
+            $chartData = rtrim($chartData, ',');
+
+            return view('chart', compact('chartData'));
+
+        } catch (\Exception $e) {
+            
+            return view('chart')->with('chartData', '');
         }
-
-        
-        $chartData = rtrim($chartData, ",");
-
-        
-        return view('chart', compact('chartData'));
     }
 }
